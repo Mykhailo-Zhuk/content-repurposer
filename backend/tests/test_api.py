@@ -37,8 +37,10 @@ def test_submit_valid_youtube_url(monkeypatch):
     assert data["status"] == "queued"
 
 
-def test_get_nonexistent_job():
+def test_get_nonexistent_job(monkeypatch):
     import uuid
+    import app.api.jobs as jobs_module
+    monkeypatch.setattr(jobs_module, "get_job", lambda job_id: None)
     response = client.get(f"/api/jobs/{uuid.uuid4()}")
     assert response.status_code == 404
 
