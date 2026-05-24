@@ -1,0 +1,50 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #f5f5f5;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #111;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+/* Progress bar animation */
+@keyframes progress-shine {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.progress-animated {
+  background: linear-gradient(
+    90deg,
+    #ff3d00 0%,
+    #ff6e40 40%,
+    #ff3d00 60%,
+    #cc3100 100%
+  );
+  background-size: 200% auto;
+  animation: progress-shine 2s linear infinite;
+}
