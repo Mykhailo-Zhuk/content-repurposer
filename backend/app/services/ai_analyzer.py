@@ -1,11 +1,33 @@
 import re
 import json
+import httpx
 from app.core.config import get_settings
 
 settings = get_settings()
 
 # Max transcript length to send to AI (prevent huge context + prompt injection)
 MAX_TRANSCRIPT_CHARS = 8000
+
+PROMPT_TEMPLATE = """You are a social media content editor. Analyze this YouTube video transcript and identify the BEST moments for a short viral clip (30-60 seconds).
+
+TRANSCRIPT:
+{transcript}
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{{
+  "moments": [
+    {{
+      "start_text": "exact phrase where clip should start",
+      "end_text": "exact phrase where clip should end",
+      "reason": "why this moment is engaging"
+    }}
+  ],
+  "title": "catchy title for the short (max 60 chars)",
+  "description": "engaging description for social media (max 150 chars)",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
+}}
+
+Pick the single most engaging moment. Focus on: surprising facts, emotional peaks, clear value, or humor."""
 
 
 def _sanitize_transcript(transcript: str) -> str:
@@ -33,45 +55,40 @@ def _sanitize_transcript(transcript: str) -> str:
 
 def analyze_transcript(transcript: str) -> dict:
     """
-    Send transcript to Gemini, get key moments + metadata for short video.
+    Send transcript to Ollama (OpenAI-compatible API), get key moments + metadata.
     Returns dict with: moments, title, description, tags
     """
-    if not settings.gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY not configured")
-
-    import google.generativeai as genai
-
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-
     safe_transcript = _sanitize_transcript(transcript)
+    prompt = PROMPT_TEMPLATE.format(transcript=safe_transcript)
 
-    prompt = f"""You are a social media content editor. Analyze this YouTube video transcript and identify the BEST moments for a short viral clip (30-60 seconds).
+    payload = {
+        "model": settings.ollama_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": 1000,
+        "stream": False,
+    }
 
-TRANSCRIPT:
-{safe_transcript}
+    base_url = settings.ollama_base_url.rstrip("/")
 
-Respond ONLY with valid JSON (no markdown, no explanation):
-{{
-  "moments": [
-    {{
-      "start_text": "exact phrase where clip should start",
-      "end_text": "exact phrase where clip should end",
-      "reason": "why this moment is engaging"
-    }}
-  ],
-  "title": "catchy title for the short (max 60 chars)",
-  "description": "engaging description for social media (max 150 chars)",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
-}}
+    try:
+        resp = httpx.post(
+            f"{base_url}/v1/chat/completions",
+            json=payload,
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        raw = data["choices"][0]["message"]["content"].strip()
+    except httpx.HTTPStatusError as e:
+        detail = e.response.text[:300]
+        raise RuntimeError(f"Ollama request failed ({e.response.status_code}): {detail}")
+    except Exception as e:
+        raise RuntimeError(f"Ollama request failed: {e}")
 
-Pick the single most engaging moment. Focus on: surprising facts, emotional peaks, clear value, or humor."""
-
-    response = model.generate_content(prompt)
-    raw = response.text.strip()
-
-    # Strip markdown fences if model added them despite instructions
+    # Strip markdown fences if the model added them despite instructions
     raw = re.sub(r"^```json\s*", "", raw)
+    raw = re.sub(r"^```\w*\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
 
     try:

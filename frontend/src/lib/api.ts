@@ -27,7 +27,8 @@ export interface SubmitResponse {
   status: JobStatus;
 }
 
-const API_BASE = "/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = `${API_URL}/api`;
 
 export async function submitJob(url: string): Promise<SubmitResponse> {
   const res = await fetch(`${API_BASE}/jobs/`, {

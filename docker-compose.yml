@@ -3,6 +3,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
     environment:
@@ -31,6 +33,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    network_mode: host
+    environment:
+      # Host networking → reach host Ollama + the Redis published on host port 6379
+      - REDIS_URL=redis://localhost:6379/0
+      - OLLAMA_BASE_URL=http://localhost:11434
     env_file:
       - .env
     volumes:
